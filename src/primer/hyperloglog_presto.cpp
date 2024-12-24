@@ -9,7 +9,7 @@ namespace bustub {
 template <typename KeyType>
 HyperLogLogPresto<KeyType>::HyperLogLogPresto(int16_t n_leading_bits) : cardinality_(0) {
   nbits_ = n_leading_bits;
-  if (nbits_ < 0) {  //边界判断
+  if (nbits_ < 0) {  // 边界判断
     std::cout << "nbits小于0" << std::endl;
     return;
   }
@@ -23,8 +23,8 @@ auto HyperLogLogPresto<KeyType>::AddElem(KeyType val) -> void {
   auto hash_value = CalculateHash(val);
   std::bitset<BITSET_CAPACITY> bina_hash(hash_value);
   bina_hash_ = bina_hash;
-  int zero_cnt = 0;                                     //最低有效位的右侧有几个0
-  for (int i = 0; i < BITSET_CAPACITY - nbits_; i++) {  //要不要保留最高位呢？要的
+  int zero_cnt = 0;                                     // 最低有效位的右侧有几个0
+  for (int i = 0; i < BITSET_CAPACITY - nbits_; i++) {  
     if (!bina_hash[i]) {
       zero_cnt++;
     } else {
@@ -47,19 +47,19 @@ template <typename T>
 auto HyperLogLogPresto<T>::ComputeCardinality() -> void {
   /** @TODO(student) Implement this function! */
 
-  //边界判断
+  // 边界判断
   if (nbits_ < 0) {
     std::cout << "nbits小于0" << std::endl;
     return;
   }
 
   double sum = 0.0;
-  //打印register的元素
-  std::cout << "buckets的元素为:";
-  for (auto elem : dense_bucket_) {
-    std::cout << elem << " ";
-  }
-  std::cout << std::endl;
+  // 打印register的元素
+  // std::cout << "buckets的元素为:";
+  // for (auto elem : dense_bucket_) {
+  //   std::cout << elem << " ";
+  // }
+  // std::cout << std::endl;
   for (size_t i = 0; i < num_buckets_; i++) {
     uint8_t overflow_bucket_value = static_cast<uint8_t>(overflow_bucket_[i].to_ulong());
     auto bucket_value = static_cast<uint8_t>(dense_bucket_[i].to_ulong());

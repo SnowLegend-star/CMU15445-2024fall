@@ -7,7 +7,7 @@ namespace bustub {
 
 template <typename KeyType>
 HyperLogLog<KeyType>::HyperLogLog(int16_t n_bits) : cardinality_(0) {
-  //边界判断
+  // 边界判断
   nbits_ = n_bits;
   if (nbits_ < 0) {
     return;
@@ -33,7 +33,7 @@ auto HyperLogLog<KeyType>::PositionOfLeftmostOne(const std::bitset<BITSET_CAPACI
       break;
     }
   }
-  if (nbits_ == 0) {  //尽管nbits_=0，最左侧的位依然要保留
+  if (nbits_ == 0) {
     cnt--;
   }
 
@@ -66,12 +66,12 @@ template <typename KeyType>
 auto HyperLogLog<KeyType>::ComputeCardinality() -> void {
   /** @TODO(student) Implement this function! */
 
-  if (nbits_ < 0) {  //边界判断
+  if (nbits_ < 0) {  // 边界判断
     return;
   }
 
   double sum = 0.0;
-  //打印register的元素
+  // 打印register的元素
   // std::cout << "register的元素为:";
   // for (auto elem : registers_) {
   //   std::cout << elem << " ";

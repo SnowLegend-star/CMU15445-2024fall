@@ -92,13 +92,13 @@ class HyperLogLogPresto {
 
     if (overflow_value != 0) {
       dense_value = zero_cnt - (overflow_value << 4);
-      std::cout << "zero_cnt: " << zero_cnt << "overflow: " << overflow_value << "dense: " << dense_value << std::endl;
+      // std::cout << "zero_cnt: " << zero_cnt << "overflow: " << overflow_value << "dense: " << dense_value << std::endl;
     }
 
     // Step 2: 获取溢出部分和密集部分
     std::bitset<OVERFLOW_BUCKET_SIZE> overflow_bits(overflow_value);
     std::bitset<DENSE_BUCKET_SIZE> dense_bits(dense_value);
-    std::cout << "dense_bit: " << dense_bits << std::endl;
+    // std::cout << "dense_bit: " << dense_bits << std::endl;
     // Step 3: 大于原来的元素才可以覆盖
     if (zero_cnt > (dense_bucket_[bucket_idx].to_ulong() + (overflow_bucket_[bucket_idx].to_ulong() << 4))) {
       dense_bucket_[bucket_idx] = dense_bits;

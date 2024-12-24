@@ -23,7 +23,7 @@ class HyperLogLog {
   static constexpr double CONSTANT = 0.79402;
 
  public:
-  std::bitset<BITSET_CAPACITY> bina_hash_;  //打印用的
+  std::bitset<BITSET_CAPACITY> bina_hash_;  // 打印用的
 
   /** @brief Disable default constructor. */
   HyperLogLog() = delete;
