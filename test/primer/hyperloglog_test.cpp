@@ -11,7 +11,7 @@
 
 namespace bustub {
 
-TEST(HyperLogLogTest, DISABLED_BasicTest1) {
+TEST(HyperLogLogTest, BasicTest1) {
   auto obj = HyperLogLog<std::string>(static_cast<int16_t>(1));
   ASSERT_EQ(obj.GetCardinality(), 0);
   obj.AddElem("Welcome to CMU DB (15-445/645)");
@@ -43,7 +43,7 @@ TEST(HyperLogLogTest, DISABLED_BasicTest1) {
   ASSERT_EQ(ans, 6);
 }
 
-TEST(HyperLogLogTest, DISABLED_BasicTest2) {
+TEST(HyperLogLogTest, BasicTest2) {
   auto obj = HyperLogLog<int64_t>(static_cast<int16_t>(3));
 
   ASSERT_EQ(obj.GetCardinality(), 0);
@@ -95,27 +95,30 @@ TEST(HyperLogLogTest, DISABLED_BasicTest2) {
   ASSERT_EQ(ans, 10);
 }
 
-TEST(HyperLogLogTest, DISABLED_EdgeTest1) {
+TEST(HyperLogLogTest, EdgeTest1) {
   auto obj1 = HyperLogLog<int64_t>(static_cast<int16_t>(-2));
+  std::cout << "val转化为binary为: " << obj1.bina_hash_ << std::endl;
   obj1.ComputeCardinality();
   ASSERT_EQ(obj1.GetCardinality(), 0);
 }
 
-TEST(HyperLogLogTest, DISABLED_EdgeTest2) {
+TEST(HyperLogLogTest, EdgeTest2) {
   auto obj = HyperLogLog<int64_t>(static_cast<int16_t>(0));
   obj.ComputeCardinality();
   ASSERT_EQ(obj.GetCardinality(), 0);
 
   obj.AddElem(1);
+  std::cout << "1转化为binary为: " << obj.bina_hash_ << std::endl;
   obj.ComputeCardinality();
   ASSERT_EQ(obj.GetCardinality(), 1665180);
 
   obj.AddElem(-1);
+  std::cout << "-1转化为binary为: " << obj.bina_hash_ << std::endl;
   obj.ComputeCardinality();
   ASSERT_EQ(obj.GetCardinality(), 1665180);
 }
 
-TEST(HyperLogLogTest, DISABLED_BasicParallelTest) {
+TEST(HyperLogLogTest, BasicParallelTest) {
   auto obj = HyperLogLog<std::string>(static_cast<int16_t>(1));
 
   std::vector<std::thread> threads1;
@@ -153,7 +156,7 @@ TEST(HyperLogLogTest, DISABLED_BasicParallelTest) {
   ASSERT_EQ(ans, 6);
 }
 
-TEST(HyperLogLogTest, DISABLED_ParallelTest1) {
+TEST(HyperLogLogTest, ParallelTest1) {
   auto obj = HyperLogLog<std::string>(static_cast<int16_t>(14));
 
   std::vector<std::thread> threads1;
@@ -186,14 +189,14 @@ TEST(HyperLogLogTest, DISABLED_ParallelTest1) {
   ASSERT_EQ(ans, 13010);
 }
 
-TEST(HyperLogLogTest, DISABLED_PrestoBasicTest1) {
+TEST(HyperLogLogTest, PrestoBasicTest1) {
   auto obj = HyperLogLogPresto<std::string>(static_cast<int16_t>(2));
   ASSERT_EQ(obj.GetCardinality(), 0);
 
   std::string str1 = "Welcome to CMU DB (15-445/645)";
 
   obj.AddElem(str1);
-
+  std::cout << "str1转化为binary为: " << obj.bina_hash_ << std::endl;
   obj.ComputeCardinality();
   auto ans = obj.GetCardinality();
   ASSERT_EQ(ans, 3);
@@ -219,25 +222,26 @@ TEST(HyperLogLogTest, DISABLED_PrestoBasicTest1) {
   ASSERT_EQ(ans, 4);
 }
 
-TEST(HyperLogLogTest, DISABLED_PrestoCase1) {
+TEST(HyperLogLogTest, PrestoCase1) {
   auto obj = HyperLogLogPresto<int64_t>(static_cast<int16_t>(1));
   auto ans = obj.GetCardinality();
 
   ASSERT_EQ(ans, 0);
 
   obj.AddElem(262144);
-
+  std::cout << "val转化为binary为: " << obj.bina_hash_ << std::endl;
   obj.ComputeCardinality();
   ans = obj.GetCardinality();
 
   ASSERT_EQ(ans, 3);
 
   auto expected1 = obj.GetDenseBucket();
+
   ASSERT_EQ(2ULL, expected1[0].to_ullong());
   ASSERT_EQ(1, obj.GetOverflowBucketofIndex(0).to_ullong());
 
   obj.AddElem(0);
-
+  std::cout << "val转化为binary为: " << obj.bina_hash_ << std::endl;
   obj.ComputeCardinality();
   ans = obj.GetCardinality();
 
@@ -258,7 +262,7 @@ TEST(HyperLogLogTest, DISABLED_PrestoCase1) {
   ASSERT_EQ(3, obj.GetOverflowBucketofIndex(0).to_ullong());
 
   obj.AddElem(-1);
-
+  std::cout << "val转化为binary为: " << obj.bina_hash_ << std::endl;
   obj.ComputeCardinality();
   ans = obj.GetCardinality();
 
@@ -275,7 +279,7 @@ TEST(HyperLogLogTest, DISABLED_PrestoCase1) {
   ASSERT_EQ(15UL, expected5[1].to_ulong());
 }
 
-TEST(HyperLogLogTest, DISABLED_PrestoCase2) {
+TEST(HyperLogLogTest, PrestoCase2) {
   auto obj = HyperLogLogPresto<int64_t>(static_cast<int16_t>(0));
   auto ans = obj.GetCardinality();
 
@@ -297,7 +301,7 @@ TEST(HyperLogLogTest, DISABLED_PrestoCase2) {
   ASSERT_EQ(obj.GetOverflowBucketofIndex(0).to_ullong(), 4);
 }
 
-TEST(HyperLogLogTest, DISABLED_PrestoEdgeCase) {
+TEST(HyperLogLogTest, PrestoEdgeCase) {
   auto obj = HyperLogLogPresto<int64_t>(static_cast<int16_t>(-2));
   obj.ComputeCardinality();
   auto ans = obj.GetCardinality();

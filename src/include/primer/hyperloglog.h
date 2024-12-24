@@ -1,6 +1,9 @@
 #pragma once
 
+#include <sys/types.h>
 #include <bitset>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <mutex>  // NOLINT
 #include <string>
@@ -20,6 +23,8 @@ class HyperLogLog {
   static constexpr double CONSTANT = 0.79402;
 
  public:
+  std::bitset<BITSET_CAPACITY> bina_hash_;  //打印用的
+
   /** @brief Disable default constructor. */
   HyperLogLog() = delete;
 
@@ -83,6 +88,10 @@ class HyperLogLog {
   size_t cardinality_;
 
   /** @todo (student) can add their data structures that support HyperLogLog */
+
+  std::vector<uint64_t> registers_;
+  size_t num_registers_;
+  int16_t nbits_;
 };
 
 }  // namespace bustub

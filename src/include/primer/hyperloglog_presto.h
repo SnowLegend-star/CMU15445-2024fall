@@ -1,6 +1,11 @@
 #pragma once
 
+#include <sys/types.h>
+#include <algorithm>
 #include <bitset>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <mutex>  // NOLINT
 #include <sstream>
@@ -10,6 +15,7 @@
 #include <vector>
 
 #include "common/util/hash_util.h"
+#include "primer/hyperloglog.h"
 
 /** @brief Dense bucket size. */
 #define DENSE_BUCKET_SIZE 4
@@ -33,6 +39,8 @@ class HyperLogLogPresto {
   static constexpr double CONSTANT = 0.79402;
 
  public:
+  std::bitset<BITSET_CAPACITY> bina_hash_;
+
   /** @brief Disabling default constructor. */
   HyperLogLogPresto() = delete;
 
@@ -73,6 +81,35 @@ class HyperLogLogPresto {
     return 0;
   }
 
+  void SplitAndStore(ulong zero_cnt, size_t bucket_idx) {
+    // 将 hash_value 转换为 std::bitset
+    std::bitset<64> bitset_hash(zero_cnt);  // 假设我们处理的是64位的哈希值
+    int tmp = zero_cnt;
+    // Step 1: 将右边连续零的数量 zero_cnt 分割成两部分
+
+    int overflow_value = tmp >> DENSE_BUCKET_SIZE;
+    int dense_value = zero_cnt;
+
+    if (overflow_value != 0) {
+      dense_value = zero_cnt - (overflow_value << 4);
+      std::cout << "zero_cnt: " << zero_cnt << "overflow: " << overflow_value << "dense: " << dense_value << std::endl;
+    }
+
+    // Step 2: 获取溢出部分和密集部分
+    std::bitset<OVERFLOW_BUCKET_SIZE> overflow_bits(overflow_value);
+    std::bitset<DENSE_BUCKET_SIZE> dense_bits(dense_value);
+    std::cout << "dense_bit: " << dense_bits << std::endl;
+    // Step 3: 大于原来的元素才可以覆盖
+    if (zero_cnt > (dense_bucket_[bucket_idx].to_ulong() + (overflow_bucket_[bucket_idx].to_ulong() << 4))) {
+      dense_bucket_[bucket_idx] = dense_bits;
+      if (overflow_bits.size() > 0) {
+        overflow_bucket_[bucket_idx] = overflow_bits;
+      }
+    }
+
+    // std::cout<<"overflow: "<<overflow_bits<<"   dense: "<<dense_bits<<std::endl;
+  }
+
   /** @brief Structure holding dense buckets (or also known as registers). */
   std::vector<std::bitset<DENSE_BUCKET_SIZE>> dense_bucket_;
 
@@ -83,6 +120,9 @@ class HyperLogLogPresto {
   uint64_t cardinality_;
 
   // TODO(student) - can add more data structures as required
+  size_t num_buckets_;
+  // uint16_t nbits_; 唐完了
+  int16_t nbits_;
 };
 
 }  // namespace bustub
