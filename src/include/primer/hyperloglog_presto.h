@@ -81,7 +81,7 @@ class HyperLogLogPresto {
     return 0;
   }
 
-  void SplitAndStore(ulong zero_cnt, size_t bucket_idx) {
+  void SplitAndStore(uint64_t zero_cnt, size_t bucket_idx) {
     // 将 hash_value 转换为 std::bitset
     std::bitset<64> bitset_hash(zero_cnt);  // 假设我们处理的是64位的哈希值
     int tmp = zero_cnt;
