@@ -92,7 +92,8 @@ class HyperLogLogPresto {
 
     if (overflow_value != 0) {
       dense_value = zero_cnt - (overflow_value << 4);
-      // std::cout << "zero_cnt: " << zero_cnt << "overflow: " << overflow_value << "dense: " << dense_value << std::endl;
+      // std::cout << "zero_cnt: " << zero_cnt << "overflow: " << overflow_value << "dense: " << dense_value <<
+      // std::endl;
     }
 
     // Step 2: 获取溢出部分和密集部分

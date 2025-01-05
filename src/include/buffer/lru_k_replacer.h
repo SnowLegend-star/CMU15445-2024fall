@@ -30,12 +30,13 @@ namespace bustub {
 enum class AccessType { Unknown = 0, Lookup, Scan, Index };
 
 class LRUKNode {
- friend class LRUKReplacer;
+  friend class LRUKReplacer;
+
  private:
   /** History of last seen K timestamps of this page. Least recent timestamp stored in front. */
   // Remove maybe_unused if you start using them. Feel free to change the member variables as you want.
 
-  std::list<size_t> history_;   //维护history的大小<=k_
+  std::list<size_t> history_;  //维护history的大小<=k_
   // size_t k_distance_;
   frame_id_t fid_;
   bool is_evictable_{false};
@@ -154,12 +155,12 @@ class LRUKReplacer {
    */
   auto Size() -> size_t;
 
-  void CkeckValidFrameID(frame_id_t frame_id){
-    if(frame_id<0||static_cast<size_t>(frame_id) >replacer_size_){
+  void CkeckValidFrameID(frame_id_t frame_id) {
+    if (frame_id < 0 || static_cast<size_t>(frame_id) > replacer_size_) {
       throw std::exception();
     }
   }
-  
+
  private:
   // TODO(student): implement me! You can replace these member variables as you like.
   // Remove maybe_unused if you start using them.

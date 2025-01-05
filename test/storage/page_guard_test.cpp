@@ -25,7 +25,7 @@ namespace bustub {
 const size_t FRAMES = 10;
 const size_t K_DIST = 2;
 
-TEST(PageGuardTest, DISABLED_DropTest) {
+TEST(PageGuardTest, DropTest) {
   auto disk_manager = std::make_shared<DiskManagerUnlimitedMemory>();
   auto bpm = std::make_shared<BufferPoolManager>(FRAMES, disk_manager.get(), K_DIST);
 
@@ -108,13 +108,17 @@ TEST(PageGuardTest, DISABLED_DropTest) {
 
   // Fetching the flushed page should result in seeing the changed value.
   auto immutable_guard = bpm->ReadPage(mutable_page_id);
+  auto data_read=immutable_guard.GetData();
+  std::string str_data(data_read);
+  std::cout<<"从immutable_guard读取的数据为: "<<str_data<<" ????"<<std::endl;
+  std::cout << std::flush;  // 强制刷新输出流
   ASSERT_EQ(0, std::strcmp("data", immutable_guard.GetData()));
 
   // Shutdown the disk manager and remove the temporary file we created.
   disk_manager->ShutDown();
 }
 
-TEST(PageGuardTest, DISABLED_MoveTest) {
+TEST(PageGuardTest, MoveTest) {
   auto disk_manager = std::make_shared<DiskManagerUnlimitedMemory>();
   auto bpm = std::make_shared<BufferPoolManager>(FRAMES, disk_manager.get(), K_DIST);
 

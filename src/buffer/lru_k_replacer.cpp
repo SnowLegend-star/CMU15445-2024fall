@@ -52,10 +52,12 @@ auto LRUKReplacer::Evict() -> std::optional<frame_id_t> {
       level1_.erase(it1);
       curr_size_--;
       node_store_.erase(tmp_min);
+      std::cout<<"被逐出的Page: "<<tmp_min<<std::endl;
       return tmp_min;
     }
   }
   if (!level2_.empty()) {
+    i=0;  // 重置i
     for (const auto &elem : level2_) {
       if (!flag && node_store_[elem].is_evictable_) {
         tmp_min = elem;
@@ -74,10 +76,11 @@ auto LRUKReplacer::Evict() -> std::optional<frame_id_t> {
     }
     if (index_min != -1) {
       auto it2 = level2_.begin();
-      std::advance(it2, index_min);
+      std::advance(it2, index_min); //这里有bug啊
       level2_.erase(it2);
       curr_size_--;
       node_store_.erase(tmp_min);
+      std::cout<<"被逐出的Frame: "<<tmp_min<<std::endl;
       return tmp_min;
     }
   }

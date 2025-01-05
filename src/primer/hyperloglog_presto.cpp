@@ -23,8 +23,8 @@ auto HyperLogLogPresto<KeyType>::AddElem(KeyType val) -> void {
   auto hash_value = CalculateHash(val);
   std::bitset<BITSET_CAPACITY> bina_hash(hash_value);
   bina_hash_ = bina_hash;
-  int zero_cnt = 0;                                     // 最低有效位的右侧有几个0
-  for (int i = 0; i < BITSET_CAPACITY - nbits_; i++) {  
+  int zero_cnt = 0;  // 最低有效位的右侧有几个0
+  for (int i = 0; i < BITSET_CAPACITY - nbits_; i++) {
     if (!bina_hash[i]) {
       zero_cnt++;
     } else {
