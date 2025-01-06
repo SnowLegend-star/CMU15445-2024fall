@@ -28,7 +28,6 @@ DiskScheduler::DiskScheduler(DiskManager *disk_manager) : disk_manager_(disk_man
   background_thread_.emplace([&] { StartWorkerThread(); });
 }
 
-
 DiskScheduler::~DiskScheduler() {
   // Put a `std::nullopt` in the queue to signal to exit the loop
   request_queue_.Put(std::nullopt);

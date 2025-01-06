@@ -52,12 +52,12 @@ auto LRUKReplacer::Evict() -> std::optional<frame_id_t> {
       level1_.erase(it1);
       curr_size_--;
       node_store_.erase(tmp_min);
-      std::cout<<"被逐出的Page: "<<tmp_min<<std::endl;
+      std::cout << "被逐出的Frame: " << tmp_min << std::endl;
       return tmp_min;
     }
   }
   if (!level2_.empty()) {
-    i=0;  // 重置i
+    i = 0;  // 重置i
     for (const auto &elem : level2_) {
       if (!flag && node_store_[elem].is_evictable_) {
         tmp_min = elem;
@@ -76,11 +76,11 @@ auto LRUKReplacer::Evict() -> std::optional<frame_id_t> {
     }
     if (index_min != -1) {
       auto it2 = level2_.begin();
-      std::advance(it2, index_min); //这里有bug啊
+      std::advance(it2, index_min);
       level2_.erase(it2);
       curr_size_--;
       node_store_.erase(tmp_min);
-      std::cout<<"被逐出的Frame: "<<tmp_min<<std::endl;
+      std::cout << "被逐出的Frame: " << tmp_min << std::endl;
       return tmp_min;
     }
   }
@@ -96,7 +96,7 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id, [[maybe_unused]] AccessType
     node_store_[frame_id].level_ = 1;
   }
 
-  if (node_store_[frame_id].history_.size() == k_) {  //如果这个frame的history大小达到临界值了
+  if (node_store_[frame_id].history_.size() == k_) {  // 如果这个frame的history大小达到临界值了
     node_store_[frame_id].history_.pop_back();
   }
 

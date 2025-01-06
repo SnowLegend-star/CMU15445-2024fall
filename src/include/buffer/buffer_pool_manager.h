@@ -127,7 +127,8 @@ class BufferPoolManager {
   auto GetPinCount(page_id_t page_id) -> std::optional<size_t>;
   auto UnpinPage(page_id_t page_id, bool is_dirty, [[maybe_unused]] AccessType access_type) -> bool;
   void PrintPGTBL();
-  auto FindPage(frame_id_t evicted_frame_id)->std::optional<page_id_t>;
+  auto FindPage(frame_id_t evicted_frame_id) -> std::optional<page_id_t>;
+  auto AcquireRWLock(frame_id_t frame_id) -> bool;
 
  private:
   /** @brief The number of frames in the buffer pool. */

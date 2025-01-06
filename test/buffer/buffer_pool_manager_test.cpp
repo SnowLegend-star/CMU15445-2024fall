@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <deque>
 #include <filesystem>
+#include <string>
 
 #include "buffer/buffer_pool_manager.h"
 #include "gtest/gtest.h"
@@ -250,6 +251,7 @@ TEST(BufferPoolManagerTest, PageAccessTest) {
       std::this_thread::sleep_for(std::chrono::milliseconds(5));
       auto guard = bpm->WritePage(pid);
       strcpy(guard.GetDataMut(), std::to_string(i).c_str());  // NOLINT
+      std::cout << "向PAGE " << pid << " 写入 " << std::to_string(i).c_str() << std::endl;
     }
   });
 
@@ -262,7 +264,7 @@ TEST(BufferPoolManagerTest, PageAccessTest) {
 
     // Save the data we observe.
     memcpy(buf, guard.GetData(), BUSTUB_PAGE_SIZE);
-
+    std::cout << "在PAGE " << pid << " 读入 " << buf << std::endl;
     // Sleep for a bit. If latching is working properly, nothing should be writing to the page.
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
@@ -391,6 +393,7 @@ TEST(BufferPoolManagerTest, EvictableTest) {
 
         // Since the only frame is pinned, no thread should be able to bring in a new page.
         ASSERT_FALSE(bpm->CheckedReadPage(loser_pid).has_value());
+        std::cout << "对loser_pid的访问无效" << std::endl;
       });
     }
 

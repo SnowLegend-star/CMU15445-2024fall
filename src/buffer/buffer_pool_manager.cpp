@@ -16,6 +16,8 @@
 #include <mutex>
 #include <optional>
 #include <utility>
+#include <vector>
+#include "buffer/lru_k_replacer.h"
 #include "common/config.h"
 #include "common/macros.h"
 #include "storage/disk/disk_manager.h"
@@ -95,7 +97,7 @@ BufferPoolManager::BufferPoolManager(size_t num_frames, DiskManager *disk_manage
 
   // The page table should have exactly `num_frames_` slots, corresponding to exactly `num_frames_` frames.
   page_table_.reserve(num_frames_);
-  std::cout<<"paga_table_初始大小为:"<<page_table_.size()<<std::endl;
+
   // Initialize all of the frame headers, and fill the free frame list with all possible frame IDs (since all frames are
   // initially free).
   for (size_t i = 0; i < num_frames_; i++) {
@@ -167,19 +169,19 @@ auto BufferPoolManager::NewPage() -> page_id_t {
  * @param page_id The page ID of the page we want to delete.
  * @return `false` if the page exists but could not be deleted, `true` if the page didn't exist or deletion succeeded.
  */
-auto BufferPoolManager::DeletePage(page_id_t page_id) -> bool { 
+auto BufferPoolManager::DeletePage(page_id_t page_id) -> bool {
   std::scoped_lock latch(*bpm_latch_);  //
   // 查找页面在不在缓冲池
 
-  auto it=page_table_.find(page_id);
-  if(it==page_table_.end()){
+  auto it = page_table_.find(page_id);
+  if (it == page_table_.end()) {
     return true;
   }
-  frame_id_t cur_frame_id=it->second;
-  auto cur_frame_header=frames_[cur_frame_id];
+  frame_id_t cur_frame_id = it->second;
+  auto cur_frame_header = frames_[cur_frame_id];
 
   // 查看页面的pinCnt
-  if(cur_frame_header->pin_count_>0){
+  if (cur_frame_header->pin_count_ > 0) {
     return false;
   }
 
@@ -187,20 +189,18 @@ auto BufferPoolManager::DeletePage(page_id_t page_id) -> bool {
   page_table_.erase(page_id);
   free_frames_.push_back(cur_frame_id);
 
-  //如果页面被更改，则写回这个页面
-  if(cur_frame_header->is_dirty_){
+  // 如果页面被更改，则写回这个页面
+  if (cur_frame_header->is_dirty_) {
     FlushPage(page_id);
   }
 
-
-  
   // 通过磁盘调度器删除磁盘上的页面
   disk_scheduler_->DeallocatePage(page_id);
 
   // 将该帧的内存数据清空
   cur_frame_header->Reset();
 
-  return false; 
+  return true;
 }
 
 /**
@@ -243,49 +243,64 @@ auto BufferPoolManager::DeletePage(page_id_t page_id) -> bool {
  * returns `std::nullopt`, otherwise returns a `WritePageGuard` ensuring exclusive and mutable access to a page's data.
  */
 auto BufferPoolManager::CheckedWritePage(page_id_t page_id, AccessType access_type) -> std::optional<WritePageGuard> {
-  std::scoped_lock latch(*bpm_latch_);
-  auto it=page_table_.find(page_id);
+  std::unique_lock latch(*bpm_latch_);
+  auto it = page_table_.find(page_id);
   frame_id_t w_frame_id;
   // case 1: BPM有这个page
-  if(it!=page_table_.end()){
-    w_frame_id=it->second;
+  if (it != page_table_.end()) {
+    w_frame_id = it->second;
     replacer_->RecordAccess(w_frame_id);
+    AcquireRWLock(w_frame_id);
     return std::make_optional(WritePageGuard(page_id, frames_[w_frame_id], replacer_, bpm_latch_));
   }
 
   // case 2: BPM没有这个page, 但是有空的frame
-  if(!free_frames_.empty()){
-    w_frame_id=free_frames_.front();
+  if (!free_frames_.empty()) {
+    w_frame_id = free_frames_.front();
     free_frames_.pop_front();
     replacer_->RecordAccess(w_frame_id);
-    next_page_id_++;
 
-    page_table_[page_id]=w_frame_id;
-    std::cout<<"checkWritePage中, ";
+    page_table_[page_id] = w_frame_id;
+    std::cout << "checkWritePage中, ";
     PrintPGTBL();
 
-    return std::make_optional(WritePageGuard(page_id,frames_[w_frame_id],replacer_,bpm_latch_));
+    // 如果这个page还有数据，要把数据一起从磁盘读回来
+    auto promise1 = disk_scheduler_->CreatePromise();
+    auto future1 = promise1.get_future();
+    disk_scheduler_->Schedule(DiskRequest{false, frames_[w_frame_id]->data_.data(), page_id, std::move(promise1)});
+    if (future1.get()) {
+      std::cout << "checkWritePage中, 从磁盘读入page: " << page_id << "的数据: " << frames_[w_frame_id]->data_.data()
+                << "成功" << std::endl;
+    }
+    AcquireRWLock(w_frame_id);
+    return std::make_optional(WritePageGuard(page_id, frames_[w_frame_id], replacer_, bpm_latch_));
   }
 
   // case 3: BPM没有这个page, 也没新的frame
-  auto evicted_frame=replacer_->Evict();
-  if(evicted_frame.has_value()){
-    w_frame_id=evicted_frame.value();
-    std::cout<<"checkWritePage中, ";
-    PrintPGTBL();
+  auto evicted_frame = replacer_->Evict();
+  if (evicted_frame.has_value()) {
+    w_frame_id = evicted_frame.value();
 
-    auto evicted_page_id=FindPage(w_frame_id).value();
-    FlushPage(evicted_page_id); // 将页面数据写回磁盘
-    
+    auto evicted_page_id = FindPage(w_frame_id).value();
+    FlushPage(evicted_page_id);  // 将页面数据写回磁盘
+
     frames_[w_frame_id]->Reset();
     replacer_->RecordAccess(w_frame_id);
     // 在PGTBL中，先清空这个entry，再插入新的
     page_table_.erase(evicted_page_id);
-    page_table_[page_id]=w_frame_id;
-    std::cout<<"checkWritePage中, ";
+    page_table_[page_id] = w_frame_id;
+    std::cout << "checkWritePage中, ";
     PrintPGTBL();
-
-    return std::make_optional(WritePageGuard(page_id,frames_[w_frame_id],replacer_,bpm_latch_));
+    // 如果这个page还有数据，要把数据一起从磁盘读回来
+    auto promise1 = disk_scheduler_->CreatePromise();
+    auto future1 = promise1.get_future();
+    disk_scheduler_->Schedule(DiskRequest{false, frames_[w_frame_id]->data_.data(), page_id, std::move(promise1)});
+    if (future1.get()) {
+      std::cout << "checkWritePage中, 从磁盘读入page: " << page_id << "的数据: " << frames_[w_frame_id]->data_.data()
+                << "成功" << std::endl;
+    }
+    AcquireRWLock(w_frame_id);
+    return std::make_optional(WritePageGuard(page_id, frames_[w_frame_id], replacer_, bpm_latch_));
   }
 
   // 如果evict失败, 说明out of memory, 报错
@@ -317,58 +332,71 @@ auto BufferPoolManager::CheckedWritePage(page_id_t page_id, AccessType access_ty
  * returns `std::nullopt`, otherwise returns a `ReadPageGuard` ensuring shared and read-only access to a page's data.
  */
 auto BufferPoolManager::CheckedReadPage(page_id_t page_id, AccessType access_type) -> std::optional<ReadPageGuard> {
-  std::scoped_lock latch(*bpm_latch_);
-  auto it=page_table_.find(page_id);
+  std::unique_lock latch(*bpm_latch_);
+  auto it = page_table_.find(page_id);
   frame_id_t r_frame_id;
   // case 1: BPM有这个page
-  if(it!=page_table_.end()){
-    r_frame_id=it->second;
+  if (it != page_table_.end()) {
+    r_frame_id = it->second;
     replacer_->RecordAccess(r_frame_id);
+    AcquireRWLock(r_frame_id);
     return std::make_optional(ReadPageGuard(page_id, frames_[r_frame_id], replacer_, bpm_latch_));
   }
 
   // case 2: BPM没有这个page, 但是有空的frame
-  if(!free_frames_.empty()){
-    r_frame_id=free_frames_.front();
+  if (!free_frames_.empty()) {
+    r_frame_id = free_frames_.front();
     free_frames_.pop_front();
     replacer_->RecordAccess(r_frame_id);
-    next_page_id_++;
-    
-    page_table_[page_id]=r_frame_id;
-    std::cout<<"checkReadPage中, ";
+
+    page_table_[page_id] = r_frame_id;
+    std::cout << "checkReadPage中, ";
     PrintPGTBL();
     // 从磁盘读入这些数据
-    auto promise1=disk_scheduler_->CreatePromise();
-    disk_scheduler_->Schedule({false/*Read*/, frames_[r_frame_id]->data_.data(),page_id,std::move(promise1)});
-    return std::make_optional(ReadPageGuard(page_id,frames_[r_frame_id],replacer_,bpm_latch_));
+    auto promise1 = disk_scheduler_->CreatePromise();
+    auto future1 = promise1.get_future();
+    disk_scheduler_->Schedule({false /*Read*/, frames_[r_frame_id]->data_.data(), page_id, std::move(promise1)});
+
+    if (future1.get()) {
+      std::cout << "从磁盘读入page: " << page_id << "的数据: " << frames_[r_frame_id]->data_.data() << "成功"
+                << std::endl;
+    }
+    AcquireRWLock(r_frame_id);
+    return std::make_optional(ReadPageGuard(page_id, frames_[r_frame_id], replacer_, bpm_latch_));
   }
 
   // case 3: BPM没有这个page, 也没新的frame
-  auto evicted_frame=replacer_->Evict();
-  if(evicted_frame.has_value()){
-    r_frame_id=evicted_frame.value();
+  auto evicted_frame = replacer_->Evict();
+  if (evicted_frame.has_value()) {
+    r_frame_id = evicted_frame.value();
 
-    auto evicted_page_id=FindPage(r_frame_id).value();
-    FlushPage(evicted_page_id); // 将页面数据写回磁盘
-    
+    auto evicted_page_id = FindPage(r_frame_id).value();
+    FlushPage(evicted_page_id);  // 将页面数据写回磁盘
+
     frames_[r_frame_id]->Reset();
     replacer_->RecordAccess(r_frame_id);
 
     page_table_.erase(evicted_page_id);
-    page_table_[page_id]=r_frame_id;
+    page_table_[page_id] = r_frame_id;
 
-    std::cout<<"checkReadPage中, ";
+    std::cout << "checkReadPage中, ";
     PrintPGTBL();
 
     // 从磁盘读入数据
-    auto promise1=disk_scheduler_->CreatePromise();
-    disk_scheduler_->Schedule({false/*Read*/, frames_[r_frame_id]->data_.data(),page_id,std::move(promise1)});
-    return std::make_optional(ReadPageGuard(page_id,frames_[r_frame_id],replacer_,bpm_latch_));
+    auto promise1 = disk_scheduler_->CreatePromise();
+    auto future1 = promise1.get_future();
+    disk_scheduler_->Schedule({false /*Read*/, frames_[r_frame_id]->data_.data(), page_id, std::move(promise1)});
+
+    if (future1.get()) {
+      std::cout << "从磁盘读入page: " << page_id << "的数据: " << frames_[r_frame_id]->data_.data() << "成功"
+                << std::endl;
+    }
+    AcquireRWLock(r_frame_id);
+    return std::make_optional(ReadPageGuard(page_id, frames_[r_frame_id], replacer_, bpm_latch_));
   }
 
   // 如果evict失败, 说明out of memory, 报错
   return std::nullopt;
-
 }
 
 /**
@@ -437,27 +465,28 @@ auto BufferPoolManager::ReadPage(page_id_t page_id, AccessType access_type) -> R
  * @param page_id The page ID of the page to be flushed.
  * @return `false` if the page could not be found in the page table, otherwise `true`.
  */
-auto BufferPoolManager::FlushPage(page_id_t page_id) -> bool { 
-  auto it=page_table_.find(page_id);
-  if(it==page_table_.end()){
+auto BufferPoolManager::FlushPage(page_id_t page_id) -> bool {
+  auto it = page_table_.find(page_id);
+  if (it == page_table_.end()) {
     return false;
   }
-  frame_id_t w_frame_id=it->second;
+  frame_id_t w_frame_id = it->second;
   // 页面不是脏页就不要写了
-  if(!frames_[w_frame_id]->is_dirty_){
-    return false;;
+  if (!frames_[w_frame_id]->is_dirty_) {
+    return false;
   }
   // 写入磁盘应该是disk的事吧
-  auto promise1=disk_scheduler_->CreatePromise();
-  auto future1=promise1.get_future();
-  disk_scheduler_->Schedule({true/*Write*/, frames_[w_frame_id]->data_.data(),page_id,std::move(promise1)});
-  if(future1.get()){
-    std::cout<<"向page: "<<page_id<<" 的数据:""写入磁盘成功"<<std::endl;
+  auto promise1 = disk_scheduler_->CreatePromise();
+  auto future1 = promise1.get_future();
+  auto data = frames_[w_frame_id]->data_.data();
+  std::string data_copy(data);
+  disk_scheduler_->Schedule({true /*Write*/, frames_[w_frame_id]->data_.data(), page_id, std::move(promise1)});
+  if (future1.get()) {
+    std::cout << "向page: " << page_id << " 的数据:" << data_copy << "写入磁盘成功" << std::endl;
   }
-  frames_[w_frame_id]->is_dirty_=false;
-  // 要不要加上future接收结果呢？
+  frames_[w_frame_id]->is_dirty_ = false;
   return true;
- }
+}
 
 /**
  * @brief Flushes all page data that is in memory to disk.
@@ -469,15 +498,13 @@ auto BufferPoolManager::FlushPage(page_id_t page_id) -> bool {
  *
  * TODO(P1): Add implementation
  */
-void BufferPoolManager::FlushAllPages() { 
-
-  for(auto page:page_table_){
-    if(!FlushPage(page.first)){
+void BufferPoolManager::FlushAllPages() {
+  for (auto page : page_table_) {
+    if (!FlushPage(page.first)) {
       BUSTUB_ASSERT("wrong when flushing all pages, at page id: {}.", page.first);
     }
   }
-
- }
+}
 
 /**
  * @brief Retrieves the pin count of a page. If the page does not exist in memory, return `std::nullopt`.
@@ -505,8 +532,8 @@ void BufferPoolManager::FlushAllPages() {
  */
 auto BufferPoolManager::GetPinCount(page_id_t page_id) -> std::optional<size_t> {
   std::scoped_lock lk(*bpm_latch_);
-  auto it=page_table_.find(page_id);
-  if(it==page_table_.end()){
+  auto it = page_table_.find(page_id);
+  if (it == page_table_.end()) {
     return std::nullopt;
   }
 
@@ -531,30 +558,42 @@ auto BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty, AccessType a
 /*
 打印页表
 */
-void BufferPoolManager::PrintPGTBL(){
-  std::cout<<"paga_table_内容为: ";
-  for(auto const& elem:page_table_){
-    std::cout<<"["<<elem.first<<","<<elem.second<<"]"<<" ";
+void BufferPoolManager::PrintPGTBL() {
+  std::cout << "paga_table_内容为: ";
+  for (auto const &elem : page_table_) {
+    std::cout << "[" << elem.first << "," << elem.second << "]"
+              << " ";
   }
-  std::cout<<std::endl;
+  std::cout << std::endl;
 }
 
 /*
 利用frame_id找到对应的page_id
 */
-auto BufferPoolManager::FindPage(frame_id_t evicted_frame_id)->std::optional<page_id_t>{
-  page_id_t evicted_page_id=-1;
-  for(auto const& elem:page_table_){
-    if(elem.second==evicted_frame_id){
-      evicted_page_id=elem.first;
+auto BufferPoolManager::FindPage(frame_id_t evicted_frame_id) -> std::optional<page_id_t> {
+  page_id_t evicted_page_id = -1;
+  for (auto const &elem : page_table_) {
+    if (elem.second == evicted_frame_id) {
+      evicted_page_id = elem.first;
       break;
     }
   }
-  if(evicted_page_id!=-1){
+  if (evicted_page_id != -1) {
     return evicted_page_id;
   }
-  std::cout<<"没找到对应的page"<<std::endl;
+  std::cout << "没找到对应的page" << std::endl;
   return std::nullopt;
 }
 
+/*
+看能不能获得RW锁
+*/
+auto BufferPoolManager::AcquireRWLock(frame_id_t frame_id) -> bool {
+  if (frames_[frame_id]->rwlatch_.try_lock()) {
+    frames_[frame_id]->rwlatch_.unlock();
+    return true;
+  }
+  bpm_latch_->unlock();
+  return false;
+}
 }  // namespace bustub
