@@ -45,8 +45,8 @@ ReadPageGuard::ReadPageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> fra
   // 先获得rw锁，再获得bmp锁
   frame_->rwlatch_.lock();
 
-  std::cout << "ReadPageGuard获得共享锁" << std::endl;
-  std::cout << "frame_->rwlatch_ address: " << &(frame_->rwlatch_) << std::endl;
+  // std::cout << "ReadPageGuard获得共享锁" << std::endl;
+  // std::cout << "frame_->rwlatch_ address: " << &(frame_->rwlatch_) << std::endl;
 
   // 在这里，我们假设一个有效的帧已被加载，接下来我们执行 pin 操作，确保该页面不会被替换。
   frame_->pin_count_++;
@@ -159,16 +159,16 @@ void ReadPageGuard::Drop() {
     frame_->pin_count_--;
     if ((frame_->pin_count_) == 0) {
       replacer_->SetEvictable(frame_->frame_id_, true);
-      std::cout << "frame: " << frame_->frame_id_ << "的pin_cnt为0" << std::endl;
+      // std::cout << "frame: " << frame_->frame_id_ << "的pin_cnt为0" << std::endl;
     }
   }
 }
 
 /** @brief The destructor for `ReadPageGuard`. This destructor simply calls `Drop()`. */
 ReadPageGuard::~ReadPageGuard() {
-  if (this->is_valid_) {
-    std::cout << "ReadPageGuard释放共享锁" << std::endl;
-  }
+  // if (this->is_valid_) {
+  //   std::cout << "ReadPageGuard释放共享锁" << std::endl;
+  // }
   Drop();
 }
 
@@ -193,8 +193,8 @@ WritePageGuard::WritePageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> f
     : page_id_(page_id), frame_(std::move(frame)), replacer_(std::move(replacer)), bpm_latch_(std::move(bpm_latch)) {
   // write_lock_= std::unique_lock<std::shared_mutex>(frame_->rwlatch_);
   frame_->rwlatch_.lock();
-  std::cout << "WritePageGuard获得独占锁" << std::endl;
-  std::cout << "frame_->rwlatch_ address: " << &(frame_->rwlatch_) << std::endl;
+  // std::cout << "WritePageGuard获得独占锁" << std::endl;
+  // std::cout << "frame_->rwlatch_ address: " << &(frame_->rwlatch_) << std::endl;
   is_valid_ = true;
   frame_->pin_count_++;
 }
@@ -317,7 +317,7 @@ void WritePageGuard::Drop() {
 /** @brief The destructor for `WritePageGuard`. This destructor simply calls `Drop()`. */
 WritePageGuard::~WritePageGuard() {
   if (this->is_valid_) {
-    std::cout << "WritePageGuard释放独占锁" << std::endl;
+    // std::cout << "WritePageGuard释放独占锁" << std::endl;
   }
   Drop();
 }

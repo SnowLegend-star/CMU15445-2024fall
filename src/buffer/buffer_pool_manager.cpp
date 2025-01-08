@@ -559,6 +559,7 @@ auto BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty, AccessType a
 打印页表
 */
 void BufferPoolManager::PrintPGTBL() {
+  return;
   std::cout << "paga_table_内容为: ";
   for (auto const &elem : page_table_) {
     std::cout << "[" << elem.first << "," << elem.second << "]"

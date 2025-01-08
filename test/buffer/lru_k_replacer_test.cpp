@@ -119,4 +119,52 @@ TEST(LRUKReplacerTest, SampleTest) {
   lru_replacer.SetEvictable(6, true);
 }
 
+TEST(LRUKReplacerTest, EvictTest) {
+  LRUKReplacer lru_replacer(10, 3);
+  lru_replacer.RecordAccess(1);
+  lru_replacer.RecordAccess(2);
+  lru_replacer.RecordAccess(3);
+  lru_replacer.RecordAccess(4);
+  lru_replacer.RecordAccess(1);
+  lru_replacer.RecordAccess(2);
+  lru_replacer.RecordAccess(3);
+  lru_replacer.RecordAccess(1);
+  lru_replacer.RecordAccess(2);
+  lru_replacer.SetEvictable(1, true);
+  lru_replacer.SetEvictable(2, true);
+  lru_replacer.SetEvictable(3, true);
+  lru_replacer.SetEvictable(4, true);
+  ASSERT_EQ(3, lru_replacer.Evict());
+}
+
+TEST(LRUKReplacerTest, SecondSimpleTest) {
+  LRUKReplacer lru_replacer(7, 3);
+
+  // [4, 3, 2, 1]
+  lru_replacer.RecordAccess(1);
+  lru_replacer.RecordAccess(2);
+  // 3的最早访问时间
+  lru_replacer.RecordAccess(3);
+  // 4的最早访问时间
+  lru_replacer.RecordAccess(4);
+  // [4, 1, 2, 3]
+  lru_replacer.RecordAccess(1);
+  lru_replacer.RecordAccess(2);
+  lru_replacer.RecordAccess(3);
+  // [4, 3, 1, 2]
+  lru_replacer.RecordAccess(1);
+  lru_replacer.RecordAccess(2);
+  // 把1，2，3，4都标记为Evictable
+  lru_replacer.SetEvictable(1, true);
+  lru_replacer.SetEvictable(2, true);
+  lru_replacer.SetEvictable(3, true);
+  lru_replacer.SetEvictable(4, true);
+
+  // 此时4被访问过1次，3被访问过2次， 4和3的访问次数都小于k
+  // 但是3的第一次访问时间早于4, 所以被淘汰的应该是3，而不是4
+
+  
+  ASSERT_EQ(3, lru_replacer.Evict());
+}
+
 }  // namespace bustub

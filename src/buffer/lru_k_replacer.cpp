@@ -134,24 +134,28 @@ void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
 
 void LRUKReplacer::Remove(frame_id_t frame_id) {
   std::lock_guard<std::mutex> lock(latch_);
-  if (!node_store_[frame_id].is_evictable_) {
-    throw std::exception();
-  }
+
   auto it = node_store_.find(frame_id);
   if (it == node_store_.end()) {
     return;
+  }
+
+  if (!node_store_[frame_id].is_evictable_) {
+    throw std::exception();
   }
 
   if (node_store_[frame_id].level_ == 1) {
     for (auto it = level1_.begin(); it != level1_.end(); it++) {
       if (*it == frame_id) {
         level1_.erase(it);
+        break;
       }
     }
   } else {
     for (auto it = level2_.begin(); it != level2_.end(); it++) {
       if (*it == frame_id) {
         level2_.erase(it);
+        break;
       }
     }
   }
